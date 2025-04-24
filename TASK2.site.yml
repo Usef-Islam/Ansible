@@ -1,0 +1,104 @@
+
+- name: Setup LAMP Stack
+  hosts: localhost
+  become: true
+  vars:
+    mysql_root_password: "12345"  # Set your MySQL root password here
+
+  tasks:
+    - name: Install Apache
+      apt:
+        name: apache2
+        state: present
+        update_cache: yes
+      become: true
+
+    - name: Ensure Apache is running and enabled
+      service:
+        name: apache2
+        state: started
+        enabled: yes
+      become: true
+
+    - name: Deploy sample index.php
+      template:
+        src: index.php.j2
+        dest: /var/www/html/index.php
+      become: true
+      notify:
+        - Restart Apache
+
+    - name: Install MySQL server
+      apt:
+        name: mysql-server
+        state: present
+        update_cache: yes
+      become: true
+
+    - name: Ensure MySQL is running and enabled
+      service:
+        name: mysql
+        state: started
+        enabled: yes
+      become: true
+
+    - name: Set MySQL root password
+      mysql_user:
+        name: root
+        host: localhost
+        password: "{{ mysql_root_password }}"
+        state: present
+      become: true
+
+    - name: Remove insecure default databases
+      mysql_db:
+        name: "{{ item }}"
+        state: absent
+      loop:
+        - test
+        - information_schema
+      become: true
+
+    - name: Install PHP and required modules
+      apt:
+        name:
+          - php
+          - libapache2-mod-php
+          - php-mysql
+        state: present
+        update_cache: yes
+      become: true
+
+    - name: Restart Apache to enable PHP
+      service:
+        name: apache2
+        state: restarted
+      become: true
+
+    - name: Install UFW
+      apt:
+        name: ufw
+        state: present
+      become: true
+
+    - name: Allow HTTP and HTTPS traffic
+      ufw:
+        rule: allow
+        name: "{{ item }}"
+      loop:
+        - 'Apache'
+        - 'HTTPS'
+      become: true
+
+    - name: Enable UFW
+      ufw:
+        state: enabled
+      become: true
+
+  handlers:
+
+    - name: Restart Apache
+      service:
+        name: apache2
+        state: restarted
+      become: true
